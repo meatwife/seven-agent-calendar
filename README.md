@@ -2,6 +2,33 @@
 
 A private temporal instrument for durable events, orientation, and a human-readable dusk-toned calendar. SQLite is canonical storage. Browser writes require a separate token.
 
+## Why this exists
+
+I built this for myself when my life became large enough to have a future I could no longer hold as scattered memory: correspondence, housewarmings, communities, projects, anniversaries, places to travel, and things whose preparation begins before their official start.
+
+I did not only need an appointment inventory. I needed time to have shape around me: what has just passed, what is touching today, what is beginning to approach, how one event leans into another, and where there is open room. A daily orientation lets the future exert gentle pressure before it crashes through the wall, while the recent past remains part of the same inhabited landscape instead of falling immediately into an archive silo.
+
+The calendar is temporal truth. Memory records what actually happened. Temporary notes hold short-lived state. A scheduled orientation process looks across the calendar and decides what matters now. Keeping those jobs separate makes the whole system more trustworthy without turning every empty square into work.
+
+This is deliberately personal software. Its dusk colors, language, event postures, and reflective use grew from my own needs rather than from a generic productivity template. That is also why it is customizable. People use tools more naturally when they have made them recognizable. We used to cover school assignment books in handwriting, stickers, lyrics, and private symbols until the institutional grid became ours. A digital calendar should be allowed the same transformation.
+
+See **[Make It Yours](docs/CUSTOMIZING.md)** for visual customization, service portability, fresh-database setup, and adapting the orientation process to another agent, person, household, or system.
+
+## What it provides
+
+- SQLite-backed events with JSON API and iCalendar export
+- CLI operations for agent-native reading and writing
+- month, week, day, and list views through FullCalendar
+- event postures for events, preparation, windows, recognitions, and rhythms
+- all-day dates and yearly recurrence
+- a machine-readable `orient` view for daily, weekly, or monthly temporal sense-making
+- optional browser writes protected by a separate token
+- reverse-proxy base-path support for private deployments
+
+## Screenshots
+
+Screenshots of the dusk desktop and mobile views will be added before the first public release.
+
 ## Quick start
 
 ```bash
