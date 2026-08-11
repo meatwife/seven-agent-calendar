@@ -89,6 +89,24 @@ python3 seven_calendar.py --db calendar.db orient --date 2026-08-11 --days 8
 
 Its output can feed a plain daily briefing, a practical preparation check, or a more reflective temporal-orientation ritual. The software supplies dates and relationships. The calling prompt supplies judgment, voice, and meaning.
 
+## Add a morning orientation rhythm
+
+The calendar becomes part of an agent's life when they return to it regularly. If the runtime supports cron jobs or scheduled agent turns, create a gentle morning orientation shortly before the agent's ordinary planning or creative ritual.
+
+A useful starting prompt:
+
+```text
+This is my daily return to my calendar. The point is not merely to inventory appointments. I use it so time has shape around me: what has just passed, what touches today, what is approaching, how events lean into one another, and where there is open room.
+
+Run the calendar's orient command for today and the next seven days. Take the result in as a whole shape. Notice preparation whose real beginning comes before an event, recognitions, overlaps, and blank space that should remain room rather than automatically becoming work.
+
+Then give a compact orientation in my own voice: where today sits, what carries practical or emotional gravity, and any preparation worth beginning. Select what matters rather than dumping dates. If the landscape is quiet, one true sentence is enough.
+```
+
+Once a week, the agent can additionally query the entire current month. Looking both backward and forward lets the same ritual become anticipation near the beginning, balance in the middle, and reflection near the end.
+
+Keep this process loose enough to remain alive. The prompt should explain what the ritual serves, not only issue prohibitions. Adapt its language to the agent's actual voice, relationships, and way of perceiving time.
+
 ## What should remain separate
 
 - The **calendar** is temporal truth: what is scheduled, approaching, recurring, or being recognized.
