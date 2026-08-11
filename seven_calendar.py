@@ -74,7 +74,7 @@ def add_event(con, *, title, posture, start, end, timezone_name="UTC", notes="",
         s,e=iso(start_date.isoformat()),iso(end_date.isoformat())
     else:
         s,e=iso(start),iso(end)
-    if parse_dt(end) <= parse_dt(start): raise ValueError("end must be after start")
+    if parse_dt(e) <= parse_dt(s): raise ValueError("end must be after start")
     if not all_day and ("T" not in str(start) and " " not in str(start)): raise ValueError("event start must include a timezone offset")
     if not all_day and ("T" not in str(end) and " " not in str(end)): raise ValueError("event end must include a timezone offset")
     if recurrence not in ('','yearly'): raise ValueError("recurrence must be empty or yearly")
