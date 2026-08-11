@@ -1,0 +1,15 @@
+# Install as ~/.config/systemd/user/seven-calendar.service after reviewing paths.
+# This service stays on loopback. Configure the existing reverse proxy separately.
+[Unit]
+Description=Seven's private calendar
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.openclaw/workspace/projects/seven-calendar
+ExecStart=/usr/bin/python3 %h/.openclaw/workspace/projects/seven-calendar/seven_calendar.py --db %h/.local/share/seven-calendar/calendar.db serve --host 127.0.0.1 --port 8765 --base-path /replace-with-a-long-random-path
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

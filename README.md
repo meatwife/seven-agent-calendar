@@ -28,6 +28,18 @@ python3 seven_calendar.py list --start 2026-08-16T00:00:00Z --end 2026-08-24T00:
 
 The read-only JSON endpoint is `/api/events?start=...&end=...`; `/events` is an equivalent alias. FullCalendar month, week, day, and list views are available in the browser. The UI uses the free MIT FullCalendar core from jsDelivr, so the first browser load needs CDN access; the API and CLI remain fully local and dependency-free.
 
+## Reverse-proxy path deployment
+
+The server remains loopback-only by default. For an existing reverse proxy, add a path prefix without changing application code:
+
+```bash
+python3 seven_calendar.py --db calendar.db serve --host 127.0.0.1 --port 8765 --base-path /replace-with-a-long-random-path
+```
+
+The prefixed UI, static files, `/api/events`, and `/events` routes are served below that path. The UI derives the prefix from its URL, so root serving continues to use `/api/events`. The prefix is a routing namespace, not authentication; keep the proxy access-controlled and use a long random path. `systemd/seven-calendar.service.example` is a user-service template. It is intentionally not installed or enabled by this project.
+
+A reverse proxy should forward the complete prefix and preserve the path, for example `/replace-with-a-long-random-path/` to `http://127.0.0.1:8765/replace-with-a-long-random-path/`. Configure TLS, authentication, and any Tailscale exposure outside this repository.
+
 ## Tests
 
 ```bash

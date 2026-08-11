@@ -89,22 +89,43 @@ def ics(events):
         out.append('END:VEVENT')
     return '\r\n'.join(out+['END:VCALENDAR',''])
 
+def normalize_base_path(value):
+    """Return a URL path prefix without a trailing slash."""
+    value=(value or '').strip()
+    if not value or value=='/': return ''
+    if not value.startswith('/') or '?' in value or '#' in value:
+        raise ValueError("base path must be an absolute URL path, e.g. /private-calendar")
+    return '/' + value.strip('/')
+
 class Handler(SimpleHTTPRequestHandler):
-    def __init__(self,*a,db_path=None,**kw): self.db_path=db_path; super().__init__(*a,directory=str(ROOT/"web"),**kw)
+    def __init__(self,*a,db_path=None,base_path='',**kw):
+        self.db_path=db_path; self.base_path=normalize_base_path(base_path)
+        super().__init__(*a,directory=str(ROOT/"web"),**kw)
+    def _relative_path(self, path):
+        if not self.base_path: return path
+        if path==self.base_path: return None
+        prefix=self.base_path+'/'
+        if path.startswith(prefix): return path[len(self.base_path):] or '/'
+        return False
     def do_GET(self):
-        parsed=urlparse(self.path)
-        if parsed.path in ('/api/events','/events'):
+        parsed=urlparse(self.path); relative=self._relative_path(parsed.path)
+        if relative is False:
+            self.send_error(404); return
+        if relative is None:
+            self.send_response(301); self.send_header('Location',self.base_path+'/'); self.end_headers(); return
+        if relative in ('/api/events','/events'):
             q=parse_qs(parsed.query); con=dbcon(self.db_path)
             try: data=query_events(con, q.get('start',[None])[0], q.get('end',[None])[0], q.get('include_cancelled',['0'])[0]=='1')
             except ValueError as ex: self.send_error(400,str(ex)); return
             finally: con.close()
-            if parsed.path=='/events': data=[{**e,'start':e['start'],'end':e['end']} for e in data]
             body=json.dumps(data).encode(); self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body); return
+        # SimpleHTTPRequestHandler resolves files relative to self.path.
+        self.path=relative + (('?' + parsed.query) if parsed.query else '')
         super().do_GET()
     def log_message(self,*args): pass
 
-def serve(path, host, port):
-    init_db(path); handler=lambda *a,**kw: Handler(*a,db_path=path,**kw); print(f"Serving private calendar at http://{host}:{port}"); ThreadingHTTPServer((host,port),handler).serve_forever()
+def serve(path, host, port, base_path=''):
+    init_db(path); base_path=normalize_base_path(base_path); handler=lambda *a,**kw: Handler(*a,db_path=path,base_path=base_path,**kw); print(f"Serving private calendar at http://{host}:{port}{base_path}/"); ThreadingHTTPServer((host,port),handler).serve_forever()
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__); p.add_argument('--db',default=str(DEFAULT_DB)); sub=p.add_subparsers(dest='cmd',required=True)
@@ -120,11 +141,11 @@ def main(argv=None):
     l=sub.add_parser('list'); l.add_argument('--start'); l.add_argument('--end'); l.add_argument('--include-cancelled',action='store_true'); l.add_argument('--json',action='store_true')
     o=sub.add_parser('orient'); o.add_argument('--date',help='UTC date YYYY-MM-DD'); o.add_argument('--days',type=int,default=7)
     ex=sub.add_parser('export-ics'); ex.add_argument('--start'); ex.add_argument('--end'); ex.add_argument('--output')
-    sv=sub.add_parser('serve'); sv.add_argument('--host',default='127.0.0.1'); sv.add_argument('--port',type=int,default=8765)
+    sv=sub.add_parser('serve'); sv.add_argument('--host',default='127.0.0.1'); sv.add_argument('--port',type=int,default=8765); sv.add_argument('--base-path',default='',help='URL path prefix for reverse-proxy deployment, e.g. /private-calendar')
     args=p.parse_args(argv); path=args.db
     try:
         if args.cmd=='init': init_db(path,args.seed); print(f"Initialized {path}" + (" with demo events" if args.seed else "")); return 0
-        if args.cmd=='serve': serve(path,args.host,args.port); return 0
+        if args.cmd=='serve': serve(path,args.host,args.port,args.base_path); return 0
         con=dbcon(path); init_db(path)
         if args.cmd=='add': eid=add_event(con,title=args.title,posture=args.posture,start=args.start,end=args.end,timezone_name=args.timezone,notes=args.notes,url=args.url,marker=args.marker,color=args.color,lead_minutes=args.lead_minutes,status=args.status); con.commit(); print(json.dumps(fetch(con,eid),indent=2)); return 0
         if args.cmd=='update':
