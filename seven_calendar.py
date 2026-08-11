@@ -2,7 +2,7 @@
 """Private local calendar prototype."""
 from __future__ import annotations
 import argparse, json, os, re, secrets, sqlite3, sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
@@ -62,8 +62,16 @@ def add_event(con, *, title, posture, start, end, timezone_name="UTC", notes="",
     if posture not in POSTURES: raise ValueError(f"posture must be one of {POSTURES}")
     if status not in STATUSES: raise ValueError(f"status must be one of {STATUSES}")
     all_day=bool(all_day)
-    if all_day and ('T' not in str(start) and ' ' not in str(start)):
-        s,e=iso(start),iso(end)
+    if all_day:
+        # All-day values are calendar dates, not instants supplied by a
+        # browser's local timezone. Store the half-open UTC date range
+        # canonically, so the exclusive end is always the following date.
+        try:
+            start_date=date.fromisoformat(str(start)[:10])
+        except ValueError as ex:
+            raise ValueError("all-day start must be a date in YYYY-MM-DD format") from ex
+        end_date=start_date + timedelta(days=1)
+        s,e=iso(start_date.isoformat()),iso(end_date.isoformat())
     else:
         s,e=iso(start),iso(end)
     if parse_dt(end) <= parse_dt(start): raise ValueError("end must be after start")

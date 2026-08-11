@@ -54,4 +54,20 @@ class CalendarTests(unittest.TestCase):
  def test_prefixed_post_and_yearly_query(self):
   add_event(self.con,title='gotcha day',posture='recognition',start='2026-05-06',end='2026-05-07',all_day=True,recurrence='yearly'); self.con.commit()
   found=query_events(self.con,'2028-05-01T00:00:00Z','2028-05-10T00:00:00Z'); self.assertEqual(found[0]['start'],'2028-05-06T00:00:00Z'); self.assertTrue(found[0]['id'])
+
+ def test_all_day_range_is_canonical_utc_midnight_and_end_exclusive(self):
+  eid=add_event(self.con,title='date only',posture='event',start='2026-08-20',end='2026-08-22T23:59:00-04:00',all_day=True); self.con.commit()
+  event=query_events(self.con,include_cancelled=True)[0]
+  self.assertEqual(event['id'],eid)
+  self.assertEqual(event['start'],'2026-08-20T00:00:00Z')
+  self.assertEqual(event['end'],'2026-08-21T00:00:00Z')
+  self.assertEqual(len(query_events(self.con,'2026-08-21T00:00:00Z','2026-08-22T00:00:00Z')),0)
+
+ def test_form_has_date_only_toggle_and_curated_palette(self):
+  html=(Path(__file__).parent/'web'/'index.html').read_text()
+  self.assertIn("startInput.type='date'",html)
+  self.assertIn('endInput.disabled=on',html)
+  for color in ('#3f7652','#8a6716','#655080','#176b73','#8b4a32','#87505f','#304a73'):
+   self.assertIn(color,html)
+  self.assertNotIn('type="color"',html)
 if __name__=='__main__': unittest.main()
