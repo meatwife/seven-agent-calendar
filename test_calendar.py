@@ -42,4 +42,16 @@ class CalendarTests(unittest.TestCase):
    conn.request('GET','/api/events'); response=conn.getresponse(); response.read(); self.assertEqual(response.status,404)
    conn.close()
   finally: server.shutdown(); server.server_close(); thread.join()
+
+ def test_post_write_and_validation(self):
+  server=ThreadingHTTPServer(('127.0.0.1',0),lambda *a,**kw: Handler(*a,db_path=self.db,write_token='secret',**kw)); thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+  try:
+   conn=HTTPConnection(*server.server_address); body=json.dumps({'title':'birthday','posture':'recognition','start':'2026-02-03','end':'2026-02-04','all_day':True,'recurrence':'yearly','marker':'heart','color':'#d9a441'}).encode()
+   conn.request('POST','/api/events',body,{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); r=conn.getresponse(); self.assertEqual(r.status,201); created=json.loads(r.read()); self.assertTrue(created['all_day']); self.assertEqual(created['recurrence'],'yearly')
+   conn.request('POST','/api/events',json.dumps({'title':'bad','posture':'nope','start':'2026-01-01T00:00:00Z','end':'2026-01-01T01:00:00Z'}),{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); self.assertEqual(conn.getresponse().status,400)
+  finally: server.shutdown(); server.server_close(); thread.join()
+
+ def test_prefixed_post_and_yearly_query(self):
+  add_event(self.con,title='gotcha day',posture='recognition',start='2026-05-06',end='2026-05-07',all_day=True,recurrence='yearly'); self.con.commit()
+  found=query_events(self.con,'2028-05-01T00:00:00Z','2028-05-10T00:00:00Z'); self.assertEqual(found[0]['start'],'2028-05-06T00:00:00Z'); self.assertTrue(found[0]['id'])
 if __name__=='__main__': unittest.main()

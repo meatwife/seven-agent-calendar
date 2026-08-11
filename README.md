@@ -1,6 +1,6 @@
 # Seven's Calendar
 
-A private, local-only temporal instrument for durable events, orientation, and a human-readable dusk-toned calendar. SQLite is canonical storage. No auth, deployment, network writes, or cron are included.
+A private temporal instrument for durable events, orientation, and a human-readable dusk-toned calendar. SQLite is canonical storage. Browser writes require a separate token.
 
 ## Quick start
 
@@ -26,7 +26,13 @@ python3 seven_calendar.py cancel 1
 python3 seven_calendar.py list --start 2026-08-16T00:00:00Z --end 2026-08-24T00:00:00Z --json
 ```
 
-The read-only JSON endpoint is `/api/events?start=...&end=...`; `/events` is an equivalent alias. FullCalendar month, week, day, and list views are available in the browser. The UI uses the free MIT FullCalendar core from jsDelivr, so the first browser load needs CDN access; the API and CLI remain fully local and dependency-free.
+The JSON endpoint is `/api/events?start=...&end=...`; `/events` is an equivalent alias. `POST /api/events` accepts a strict JSON event object and requires `X-Calendar-Write-Token` (or `Authorization: Bearer ...`). FullCalendar month, week, day, and list views are available in the browser. The UI uses the free MIT FullCalendar core from jsDelivr, so the first browser load needs CDN access; the API and CLI remain dependency-free.
+
+Set a long random token in the service environment, for example `CALENDAR_WRITE_TOKEN=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')`, and keep it out of HTML and logs. Add `EnvironmentFile=%h/.config/seven-calendar.env` and a file containing `CALENDAR_WRITE_TOKEN=...` to the example service before installing it. The browser unlock flow accepts the token once from the URL fragment, stores it in local storage, then removes it from the address bar. Exact guest URL pattern:
+
+`https://HOST/replace-with-a-long-random-path/#write-token=YOUR_TOKEN`
+
+The fragment is never sent to the server. The **Add event** form supports all-day recognition dates and yearly recurrence for birthdays or gotcha days. All event text is inserted into the calendar with DOM text nodes, not HTML.
 
 ## Reverse-proxy path deployment
 

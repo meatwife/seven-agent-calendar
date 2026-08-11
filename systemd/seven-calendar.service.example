@@ -7,6 +7,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%h/.openclaw/workspace/projects/seven-calendar
+EnvironmentFile=%h/.config/seven-calendar.env
 ExecStart=/usr/bin/python3 %h/.openclaw/workspace/projects/seven-calendar/seven_calendar.py --db %h/.local/share/seven-calendar/calendar.db serve --host 127.0.0.1 --port 8765 --base-path /replace-with-a-long-random-path
 Restart=always
 RestartSec=3

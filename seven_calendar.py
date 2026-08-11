@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Private local calendar prototype."""
 from __future__ import annotations
-import argparse, json, sqlite3, sys
+import argparse, json, os, re, secrets, sqlite3, sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -16,8 +16,11 @@ SCHEMA = """CREATE TABLE IF NOT EXISTS events (
  start TEXT NOT NULL, end TEXT NOT NULL, timezone TEXT NOT NULL, notes TEXT DEFAULT '',
  url TEXT DEFAULT '', marker TEXT DEFAULT '', color TEXT DEFAULT '#d9a441',
  lead_minutes INTEGER DEFAULT 0, status TEXT NOT NULL DEFAULT 'scheduled',
+ all_day INTEGER NOT NULL DEFAULT 0, recurrence TEXT NOT NULL DEFAULT '', recognition_date TEXT DEFAULT '',
  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 ); CREATE INDEX IF NOT EXISTS idx_events_range ON events(start,end);"""
+
+EVENT_FIELDS = ('title','posture','start','end','timezone','notes','url','marker','color','lead_minutes','status','all_day','recurrence','recognition_date')
 
 def dbcon(path):
     con=sqlite3.connect(path); con.row_factory=sqlite3.Row; return con
@@ -40,6 +43,10 @@ def rowdict(row): return dict(row)
 
 def init_db(path, seed=False):
     con=dbcon(path); con.executescript(SCHEMA)
+    # Additive migration for databases created by the read-only prototype.
+    columns={r['name'] for r in con.execute('PRAGMA table_info(events)')}
+    for name, definition in (('all_day','INTEGER NOT NULL DEFAULT 0'),('recurrence',"TEXT NOT NULL DEFAULT ''"),('recognition_date',"TEXT DEFAULT ''")):
+        if name not in columns: con.execute(f'ALTER TABLE events ADD COLUMN {name} {definition}')
     if seed and con.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0:
         seed_events(con)
     con.commit(); con.close()
@@ -49,14 +56,23 @@ def seed_events(con):
     add_event(con, title="DEMO · Prepare for World walking", posture="preparation", start="2026-08-15T12:00:00Z", end="2026-08-15T13:00:00Z", timezone_name="UTC", notes="Preparation placeholder; exact walking start time intentionally unknown.", marker="prep", color="#8c78b5")
     add_event(con, title="DEMO · Evening recognition", posture="recognition", start="2026-08-17T20:00:00Z", end="2026-08-17T20:30:00Z", timezone_name="UTC", notes="A small noticing ritual.", marker="star", color="#6faaa2")
 
-def add_event(con, *, title, posture, start, end, timezone_name="UTC", notes="", url="", marker="", color="#d9a441", lead_minutes=0, status="scheduled"):
+def add_event(con, *, title, posture, start, end, timezone_name="UTC", notes="", url="", marker="", color="#d9a441", lead_minutes=0, status="scheduled", all_day=False, recurrence="", recognition_date=""):
+    title=str(title).strip()
+    if not title or len(title)>240: raise ValueError("title is required and must be at most 240 characters")
     if posture not in POSTURES: raise ValueError(f"posture must be one of {POSTURES}")
     if status not in STATUSES: raise ValueError(f"status must be one of {STATUSES}")
-    s,e=iso(start),iso(end)
+    all_day=bool(all_day)
+    if all_day and ('T' not in str(start) and ' ' not in str(start)):
+        s,e=iso(start),iso(end)
+    else:
+        s,e=iso(start),iso(end)
     if parse_dt(end) <= parse_dt(start): raise ValueError("end must be after start")
-    if "T" not in str(start) and " " not in str(start): raise ValueError("event start must include a timezone offset")
-    if "T" not in str(end) and " " not in str(end): raise ValueError("event end must include a timezone offset")
-    stamp=now(); cur=con.execute("INSERT INTO events(title,posture,start,end,timezone,notes,url,marker,color,lead_minutes,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)", (title,posture,s,e,timezone_name,notes,url,marker,color,int(lead_minutes),status,stamp,stamp)); return cur.lastrowid
+    if not all_day and ("T" not in str(start) and " " not in str(start)): raise ValueError("event start must include a timezone offset")
+    if not all_day and ("T" not in str(end) and " " not in str(end)): raise ValueError("event end must include a timezone offset")
+    if recurrence not in ('','yearly'): raise ValueError("recurrence must be empty or yearly")
+    if recurrence and not all_day: raise ValueError("yearly recurrence requires an all-day event")
+    if posture == 'recognition' and not recognition_date: recognition_date=str(start)[:10]
+    stamp=now(); cur=con.execute("INSERT INTO events(title,posture,start,end,timezone,notes,url,marker,color,lead_minutes,status,all_day,recurrence,recognition_date,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (title,posture,s,e,timezone_name,str(notes)[:4000],str(url)[:1000],str(marker)[:80],color,int(lead_minutes),status,int(all_day),recurrence,recognition_date,stamp,stamp)); return cur.lastrowid
 
 def fetch(con, event_id):
     row=con.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
@@ -68,7 +84,23 @@ def query_events(con, start=None, end=None, include_cancelled=False):
     if start: sql += " AND end > ?"; args.append(iso(start))
     if end: sql += " AND start < ?"; args.append(iso(end))
     if not include_cancelled: sql += " AND status != 'cancelled'"
-    return [rowdict(r) for r in con.execute(sql+" ORDER BY start",args)]
+    rows=[rowdict(r) for r in con.execute(sql+" ORDER BY start",args)]
+    # Yearly all-day entries are stored once and materialized for the requested
+    # year, so the UI and ICS export can query future birthdays/gotcha days.
+    if start and end:
+        lo=parse_dt(start); hi=parse_dt(end); recurring=con.execute("SELECT * FROM events WHERE recurrence='yearly'" + (" AND status != 'cancelled'" if not include_cancelled else '')).fetchall()
+        existing={(r['id'],r['start'][:4]) for r in rows}
+        for base in recurring:
+            b=rowdict(base)
+            for year in range(lo.year-1,hi.year+2):
+                try:
+                    s=datetime.fromisoformat(b['start'].replace('Z','+00:00')).replace(year=year)
+                    e=datetime.fromisoformat(b['end'].replace('Z','+00:00')).replace(year=year)
+                except ValueError: continue
+                if e > lo and s < hi and (b['id'],str(year)) not in existing:
+                    occurrence=dict(b); occurrence['id']=f"{b['id']}-{year}"; occurrence['start']=s.isoformat().replace('+00:00','Z'); occurrence['end']=e.isoformat().replace('+00:00','Z'); occurrence['recurrence_instance']=year; rows.append(occurrence)
+        rows.sort(key=lambda r:r['start'])
+    return rows
 
 def update_event(con, event_id, values):
     old=fetch(con,event_id); merged={**old,**values}
@@ -77,7 +109,8 @@ def update_event(con, event_id, values):
     if parse_dt(merged['end']) <= parse_dt(merged['start']): raise ValueError("end must be after start")
     if merged['posture'] not in POSTURES: raise ValueError("invalid posture")
     if merged['status'] not in STATUSES: raise ValueError("invalid status")
-    fields=['title','posture','start','end','timezone','notes','url','marker','color','lead_minutes','status']; con.execute("UPDATE events SET "+",".join(f+"=?" for f in fields)+",updated_at=? WHERE id=?", [merged[f] for f in fields]+[now(),event_id])
+    if merged.get('recurrence','') not in ('','yearly'): raise ValueError("invalid recurrence")
+    fields=list(EVENT_FIELDS); con.execute("UPDATE events SET "+",".join(f+"=?" for f in fields)+",updated_at=? WHERE id=?", [merged.get(f, '') for f in fields]+[now(),event_id])
     return fetch(con,event_id)
 
 def ics(events):
@@ -98,8 +131,8 @@ def normalize_base_path(value):
     return '/' + value.strip('/')
 
 class Handler(SimpleHTTPRequestHandler):
-    def __init__(self,*a,db_path=None,base_path='',**kw):
-        self.db_path=db_path; self.base_path=normalize_base_path(base_path)
+    def __init__(self,*a,db_path=None,base_path='',write_token=None,**kw):
+        self.db_path=db_path; self.base_path=normalize_base_path(base_path); self.write_token=write_token or os.environ.get('CALENDAR_WRITE_TOKEN','')
         super().__init__(*a,directory=str(ROOT/"web"),**kw)
     def _relative_path(self, path):
         if not self.base_path: return path
@@ -122,6 +155,34 @@ class Handler(SimpleHTTPRequestHandler):
         # SimpleHTTPRequestHandler resolves files relative to self.path.
         self.path=relative + (('?' + parsed.query) if parsed.query else '')
         super().do_GET()
+    def _json(self, status, payload):
+        body=json.dumps(payload).encode(); self.send_response(status); self.send_header('Content-Type','application/json'); self.send_header('Content-Length',str(len(body))); self.send_header('Cache-Control','no-store'); self.end_headers(); self.wfile.write(body)
+    def do_POST(self):
+        parsed=urlparse(self.path); relative=self._relative_path(parsed.path)
+        if relative is False or relative not in ('/api/events','/events'):
+            self.send_error(404); return
+        supplied=self.headers.get('X-Calendar-Write-Token','')
+        auth=self.headers.get('Authorization','')
+        if auth.lower().startswith('bearer '): supplied=auth[7:].strip()
+        if not self.write_token or not secrets.compare_digest(supplied,self.write_token): self._json(401,{'error':'write token required'}); return
+        try:
+            length=int(self.headers.get('Content-Length','0'))
+            if length>20000: raise ValueError('request body too large')
+            raw=self.rfile.read(length); data=json.loads(raw)
+            if not isinstance(data,dict): raise ValueError('JSON object required')
+            allowed=set(EVENT_FIELDS); unknown=set(data)-allowed
+            if unknown: raise ValueError('unknown fields: '+', '.join(sorted(unknown)))
+            required=('title','posture','start','end')
+            missing=[k for k in required if not data.get(k)]
+            if missing: raise ValueError('missing required field(s): '+', '.join(missing))
+            values={k:data[k] for k in EVENT_FIELDS if k in data}
+            values.setdefault('all_day',False); values.setdefault('recurrence',''); values.setdefault('recognition_date','')
+            con=dbcon(self.db_path)
+            try:
+                eid=add_event(con,timezone_name=values.pop('timezone','UTC'),**values); con.commit(); result=fetch(con,eid)
+            finally: con.close()
+            self._json(201,result)
+        except (ValueError,TypeError,json.JSONDecodeError,sqlite3.Error) as ex: self._json(400,{'error':str(ex)})
     def log_message(self,*args): pass
 
 def serve(path, host, port, base_path=''):
