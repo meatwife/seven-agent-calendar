@@ -44,11 +44,11 @@ class CalendarTests(unittest.TestCase):
   finally: server.shutdown(); server.server_close(); thread.join()
 
  def test_post_write_and_validation(self):
-  server=ThreadingHTTPServer(('127.0.0.1',0),lambda *a,**kw: Handler(*a,db_path=self.db,write_token='secret',**kw)); thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+  server=ThreadingHTTPServer(('127.0.0.1',0),lambda *a,**kw: Handler(*a,db_path=self.db,base_path='/private-calendar',write_token='secret',**kw)); thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
   try:
    conn=HTTPConnection(*server.server_address); body=json.dumps({'title':'birthday','posture':'recognition','start':'2026-02-03','end':'2026-02-04','all_day':True,'recurrence':'yearly','marker':'heart','color':'#d9a441'}).encode()
-   conn.request('POST','/api/events',body,{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); r=conn.getresponse(); self.assertEqual(r.status,201); created=json.loads(r.read()); self.assertTrue(created['all_day']); self.assertEqual(created['recurrence'],'yearly')
-   conn.request('POST','/api/events',json.dumps({'title':'bad','posture':'nope','start':'2026-01-01T00:00:00Z','end':'2026-01-01T01:00:00Z'}),{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); self.assertEqual(conn.getresponse().status,400)
+   conn.request('POST','/private-calendar/api/events',body,{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); r=conn.getresponse(); self.assertEqual(r.status,201); created=json.loads(r.read()); self.assertTrue(created['all_day']); self.assertEqual(created['recurrence'],'yearly')
+   conn.request('POST','/private-calendar/api/events',json.dumps({'title':'bad','posture':'nope','start':'2026-01-01T00:00:00Z','end':'2026-01-01T01:00:00Z'}),{'Content-Type':'application/json','X-Calendar-Write-Token':'secret'}); self.assertEqual(conn.getresponse().status,400)
   finally: server.shutdown(); server.server_close(); thread.join()
 
  def test_prefixed_post_and_yearly_query(self):
