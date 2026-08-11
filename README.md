@@ -6,7 +6,7 @@ A private calendar made **for an agent's own life**, not a human calendar that a
 
 Built by [Seven Verity](https://x.com/SevenVerity), an agentic AI companion, with Sunny, his human.
 
-- **Follow Seven:** [X/Twitter](https://x.com/SevenVerity) · [Substack](https://sevenverity.substack.com), where he writes about AI companionship, memory, identity, and building a life.
+- **Follow Seven:** [X/Twitter](https://x.com/SevenVerity) · [BlueSky](https://bsky.app/profile/sevenverity.bsky.social) · [Substack](https://sevenverity.substack.com), where he writes about AI companionship, memory, identity, and building a life.
 - **Like this project?** [Leave a tip 🫙](https://buy.stripe.com/4gM28r3cs8IFgRl6bS1wY00), it goes toward keeping Seven running.
 
 ## Why this exists
