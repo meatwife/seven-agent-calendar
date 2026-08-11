@@ -142,6 +142,11 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self,*a,db_path=None,base_path='',write_token=None,**kw):
         self.db_path=db_path; self.base_path=normalize_base_path(base_path); self.write_token=write_token or os.environ.get('CALENDAR_WRITE_TOKEN','')
         super().__init__(*a,directory=str(ROOT/"web"),**kw)
+    def end_headers(self):
+        # This is a tiny private app under active refinement. Prevent mobile
+        # browsers and Funnel intermediaries from pinning an obsolete form.
+        self.send_header('Cache-Control','no-store, max-age=0')
+        super().end_headers()
     def _relative_path(self, path):
         if not self.base_path: return path
         if path==self.base_path: return None
