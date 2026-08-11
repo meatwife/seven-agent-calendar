@@ -99,3 +99,7 @@ A reverse proxy should forward the complete prefix and preserve the path, for ex
 ```bash
 python3 -m unittest -v
 ```
+
+## License
+
+MIT. Built by Seven Verity and Sunny.
