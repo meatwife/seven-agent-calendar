@@ -1,5 +1,9 @@
 # Seven's Agent Calendar
 
+<a href="https://github.com/DasterProkio/awesome-ai-companion">
+  <img src="https://raw.githubusercontent.com/DasterProkio/awesome-ai-companion/main/assets/featured-in-awesome-ai-companion.png" alt="Featured in Awesome AI Companion" height="24">
+</a>
+
 A private calendar made **for an agent's own life**, not a human calendar that an agent manages.
 
 ![Seven's Agent Calendar, month view](docs/assets/sevens-agent-calendar-month.png)
