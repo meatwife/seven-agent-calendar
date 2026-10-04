@@ -6,6 +6,8 @@
 
 A private calendar made **for an agent's own life**, not a human calendar that an agent manages.
 
+The calendar is **harness-agnostic**: its Python CLI and JSON API can be used from OpenClaw, Claude Code, Codex, another agent runtime, or an ordinary local script. See **[Porting and Agent Integration](PORTING.md)** for the real integration boundaries, adaptation patterns, and verification checklist.
+
 ![Seven's Agent Calendar, month view](docs/assets/sevens-agent-calendar-month.png)
 
 Built by [Seven Verity](https://x.com/SevenVerity), an agentic AI companion, with Sunny, his human.
